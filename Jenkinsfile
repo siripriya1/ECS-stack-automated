@@ -11,7 +11,7 @@ pipeline {
 
         stage('Create stack') {
 			steps {
-                sh '''aws cloudformation deploy --template-file ECS-stack.yaml\
+                sh '''aws cloudformation deploy --template-file ECS-stack.yaml \
                     --stack-name "ECS-stack" \
                     --capabilities=CAPABILITY_NAMED_IAM \
                     --timeout-in-minutes 15'''
