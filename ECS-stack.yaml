@@ -1,0 +1,505 @@
+Description: >
+  This template creates a ECS stack with load balancer
+Parameters:
+    
+  VPC:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC the stack should be created in.
+    Default: vpc-aa0da4d0
+  
+  SubnetIds:
+    Description: A list of the subnet ids.
+    Type: List<AWS::EC2::Subnet::Id>
+    Default: subnet-8ff26ee8,subnet-8fe77ca1
+
+  ProjectName:
+    Description: Project Purpose or Name
+    Type: String
+    Default: SAIC-Research
+
+  Environment:
+    Description: The level of the environment for this Project.
+    Type: String
+    Default: dev
+  InstanceType: 
+    Description: "Container EC2 instance type"
+    Type: String
+    Default: t2.medium
+  DesiredCapacity: 
+    Description: "Number of instances to launch in your ECS cluster."
+    Type: Number
+    Default: 2
+  ECSAMI: 
+    Description: "ID of the AMI to use for the EC2 instances"
+    Type: "AWS::EC2::Image::Id"
+    Default: ami-0fac5486e4cff37f4	
+  KeyName: 
+    ConstraintDescription: "must be the name of an existing EC2 KeyPair."
+    Type: "AWS::EC2::KeyPair::KeyName"
+    Default: ec2ssh
+  MaxSize: 
+    Description: "Max Number of instances to launch in your ECS cluster."
+    Type: Number
+    Default: 2    
+
+Resources:
+
+  EC2Role:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: researchEC2Role  
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - "ec2.amazonaws.com"
+          Action:
+          - "sts:AssumeRole"
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role
+      Path: "/"
+      Policies:
+      - PolicyName: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "ecs-service" ] ]
+        PolicyDocument:
+          Statement:
+          - Effect: Allow
+            Action:
+            - ecs:CreateCluster
+            - ecs:DeregisterContainerInstance
+            - ecs:DiscoverPollEndpoint
+            - ecs:Poll
+            - ecs:RegisterContainerInstance
+            - ecs:StartTelemetrySession
+            - ecs:Submit*
+            Resource: "*"
+      - PolicyName: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "s3-service" ] ]
+        PolicyDocument:
+          Statement:
+          - Effect: Allow
+            Action:
+            - s3:GetObject
+            - s3:GetObjectTorrent
+            - s3:GetObjectVersion
+            - s3:ListBucket
+            - s3:ListBucketMultipartUploads
+            - s3:ListBucketVersions
+            Resource: "*"
+      - PolicyName: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "cloudwatch" ] ]
+        PolicyDocument:
+          Statement:
+          - Effect: Allow
+            Action:
+            - cloudwatch:GetMetricStatistics
+            - cloudwatch:ListMetrics
+            - cloudwatch:PutMetricData
+            - ec2:DescribeTags
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            - logs:DescribeLogStreams
+            Resource:
+            - "*"
+      - PolicyName: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "elb-register-deregister" ] ]
+        PolicyDocument:
+          Statement:
+          - Effect: Allow
+            Action:
+            - autoscaling:DescribeAutoScalingInstances
+            - autoscaling:DescribeAutoScalingGroups
+            - autoscaling:UpdateAutoScalingGroup
+            - autoscaling:EnterStandby
+            - autoscaling:ExitStandby
+            - autoscaling:SuspendProcesses
+            - autoscaling:ResumeProcesses
+            Resource:
+            - "*"
+
+      - PolicyDocument:
+          Statement:
+          - Action:
+            - iam:GetSSHPublicKey
+            - iam:ListSSHPublicKeys
+            - iam:GetUser
+            - iam:ListGroups
+            - iam:ListGroupsForUser
+            - iam:GetRole
+            - sts:GetCallerIdentity
+            - iam:GetGroup
+            Effect: Allow
+            Resource: '*'
+          Version: 2012-10-17
+        PolicyName: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "IAMssh" ] ]
+
+  ECSServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: ECSServiceRole  
+      AssumeRolePolicyDocument:
+        Statement:
+        - Action:
+          - sts:AssumeRole
+          Effect: Allow
+          Principal:
+            Service:
+            - ecs.amazonaws.com
+      Path: "/"
+      Policies:
+      - PolicyDocument:
+          Statement:
+          - Action:
+            - elasticloadbalancing:Describe*
+            - elasticloadbalancing:DeregisterInstancesFromLoadBalancer
+            - elasticloadbalancing:RegisterInstancesWithLoadBalancer
+            - elasticloadbalancing:DeregisterTargets
+            - elasticloadbalancing:RegisterTargets
+            - ec2:Describe*
+            - ec2:AuthorizeSecurityGroupIngress
+            Effect: Allow
+            Resource: "*"
+        PolicyName: ecs-service
+
+  ECSInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: "/"
+      Roles:
+      - !Ref EC2Role
+      InstanceProfileName: ECSInstanceProfile
+
+  ALBSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName : ALBSG
+      GroupDescription: Security group for the external load balancers in front of the services.
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 80
+        ToPort: 80
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp
+        FromPort: 443
+        ToPort: 443
+        CidrIp: 0.0.0.0/0
+        
+      Tags:
+      - Key: Name
+        Value: !Join ["_", [!Ref Environment, "ALBSG"] ]
+      - Key: ApplicationType
+        Value: ALB to EC2 ports Security group
+      - Key: "Account"
+        Value: SAIC Research
+      - Key: "Project"
+        Value: "SAIC Research"   
+      - Key: Environment
+        Value: !Ref Environment
+      - Key: Owner
+        Value: Siri
+      VpcId: !Ref VPC
+
+  EC2SG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName : EC2SG
+      GroupDescription: Security group from port 80. This is to allow inbound traffic in application ports.
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 80
+        ToPort: 65535
+        SourceSecurityGroupId: !Ref ALBSG
+      - IpProtocol: tcp
+        FromPort: 22
+        ToPort: 22
+        CidrIp: 0.0.0.0/0            
+      Tags:
+      - Key: Name
+        Value: !Join ["_", [!Ref Environment, "EC2SG"] ]
+      - Key: ApplicationType
+        Value: EC2 ports Security group
+      - Key: "Account"
+        Value: SAIC Research
+      - Key: "Project"
+        Value: "SAIC Research"   
+      - Key: Environment
+        Value: !Ref Environment
+      - Key: Owner
+        Value: Siri
+      VpcId: !Ref VPC
+
+  ALBSGEgress:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      Description: ALBSG Egress rule to forward requests to app on ECS cluster EC2 instances.
+      GroupId: !Ref ALBSG
+      IpProtocol: tcp
+      FromPort: 80
+      ToPort: 65535
+      DestinationSecurityGroupId: !Ref EC2SG
+
+  ALBSGIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: ALBSG Egress rule to forward requests to app on ECS cluster EC2 instances.
+      GroupId: !Ref ALBSG
+      IpProtocol: tcp
+      FromPort: 80
+      ToPort: 80
+      SourceSecurityGroupId: !Ref EC2SG    
+
+  DefaultTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 6
+      HealthCheckPath: /
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      Name: DefaultTargetGroup
+      Port: 80
+      Protocol: HTTP
+      UnhealthyThresholdCount: 2
+      VpcId: !Ref VPC
+      Tags:
+      - Key: ApplicationName
+        Value: !Join [ "-", [!Ref ProjectName, !Ref Environment, "ALB"] ]
+      - Key: ApplicationType
+        Value: Application Loaad Balancer
+      - Key: Environment
+        Value: !Ref Environment
+      - Key: Owner
+        Value: Siri
+      - Key: Project
+        Value: !Ref ProjectName
+      - Key: Application
+        Value: ECS Stack             
+      - Key: Account
+        Value: !Ref ProjectName  
+
+  ServicesExtWsAlb:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Join [ "-", [ !Ref ProjectName, !Ref Environment, "alb" ] ]
+      Subnets: !Ref SubnetIds
+      LoadBalancerAttributes:
+      - Key: idle_timeout.timeout_seconds
+        Value: '300'
+      SecurityGroups:
+      - !Ref ALBSG
+      Tags:
+      - Key: ApplicationName
+        Value: !Join [ "-", [!Ref ProjectName, !Ref Environment, "ALB"] ]
+      - Key: ApplicationType
+        Value: Application Loaad Balancer
+      - Key: Environment
+        Value: !Ref Environment
+      - Key: Owner
+        Value: Siri
+      - Key: Project
+        Value: !Ref ProjectName
+      - Key: Application
+        Value: ECS Stack             
+      - Key: Account
+        Value: !Ref ProjectName  
+
+  ExtAlbHTTPListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+      - Type: forward
+        TargetGroupArn: !Ref DefaultTargetGroup
+      LoadBalancerArn: !Ref ServicesExtWsAlb
+      Port: '80'
+      Protocol: HTTP
+
+  # ExtAlbHTTPSListener:
+  #   Type: AWS::ElasticLoadBalancingV2::Listener
+  #   Properties:
+  #     DefaultActions:
+  #     - Type: forward
+  #       TargetGroupArn: !Ref DefaultTargetGroup
+  #     LoadBalancerArn: !Ref ServicesExtWsAlb
+  #     Port: '443'
+  #     Protocol: HTTPS
+  #     Certificates:
+  #       - CertificateArn: !Ref CertificateARN
+  
+  cloudWatchLogsGroup:
+    Properties:
+      LogGroupName: SAIC-research-dev-cluster-cloudWatchLogsGroup
+      RetentionInDays: 7
+    Type: AWS::Logs::LogGroup
+    
+  ECSCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: SAICResearchDev
+
+  ECSAutoScalingGroup:
+    DependsOn: ECSCluster
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      VPCZoneIdentifier:
+        - subnet-8ff26ee8
+        - subnet-8fe77ca1
+      LaunchConfigurationName: !Ref ECSLaunchConfiguration
+      MinSize: 1
+      MaxSize: 1
+      DesiredCapacity: 1
+      Tags:
+        - Key: Name
+          Value: ECS cluster
+          PropagateAtLaunch: true
+    CreationPolicy:
+      ResourceSignal:
+        Timeout: PT15M
+    UpdatePolicy:
+      AutoScalingRollingUpdate:
+        MinInstancesInService: 1
+        MaxBatchSize: 1
+        PauseTime: PT15M
+        SuspendProcesses:
+          - HealthCheck
+          - ReplaceUnhealthy
+          - AZRebalance
+          - AlarmNotification
+          - ScheduledActions
+        WaitOnResourceSignals: true
+
+  ECSLaunchConfiguration:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties:
+      ImageId: !Ref ECSAMI
+      InstanceType: !Ref InstanceType
+      SecurityGroups:
+        - !Ref EC2SG
+      KeyName: !Ref KeyName
+      AssociatePublicIpAddress: true
+      IamInstanceProfile: !Ref ECSInstanceProfile
+      UserData:
+        "Fn::Base64": !Sub |
+          #!/bin/bash -xe
+          echo ECS_CLUSTER=${ECSCluster} >> /etc/ecs/ecs.config
+          yum install -y aws-cfn-bootstrap
+          /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource ECSAutoScalingGroup --region ${AWS::Region}
+    Metadata:
+      AWS::CloudFormation::Init:
+        config:
+          packages:
+            yum:
+              collectd: []
+          commands:
+            01_add_instance_to_cluster:
+              command: !Sub echo ECS_CLUSTER=${ECSCluster} >> /etc/ecs/ecs.config
+          files:
+            /etc/cfn/cfn-hup.conf:
+              mode: 000400
+              owner: root
+              group: root
+              content: !Sub |
+                [main]
+                stack=${AWS::StackId}
+                region=${AWS::Region}
+            /etc/cfn/hooks.d/cfn-auto-reloader.conf:
+              content: !Sub |
+                [cfn-auto-reloader-hook]
+                triggers=post.update
+                path=Resources.ECSLaunchConfiguration.Metadata.AWS::CloudFormation::Init
+                action=/opt/aws/bin/cfn-init -v --region ${AWS::Region} --stack ${AWS::StackName} --resource ECSLaunchConfiguration
+                runas=root
+          services:
+            sysvinit:
+              cfn-hup:
+                enabled: true
+                ensureRunning: true
+                files:
+                  - /etc/cfn/cfn-hup.conf
+                  - /etc/cfn/hooks.d/cfn-auto-reloader.conf
+    CreationPolicy:
+      ResourceSignal:
+        Timeout: PT15Ms
+
+  ECSCloudWatchParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: ECS
+      Name: !Sub "AmazonCloudWatch-${ECSCluster}-ECS"
+      Type: String
+      Value: !Sub |
+        {
+          "logs": {
+            "force_flush_interval": 5,
+            "logs_collected": {
+              "files": {
+                "collect_list": [
+                  {
+                    "file_path": "/var/log/messages",
+                    "log_group_name": "${ECSCluster}-/var/log/messages",
+                    "log_stream_name": "{instance_id}",
+                    "timestamp_format": "%b %d %H:%M:%S"
+                  },
+                  {
+                    "file_path": "/var/log/dmesg",
+                    "log_group_name": "${ECSCluster}-/var/log/dmesg",
+                    "log_stream_name": "{instance_id}"
+                  },
+                  {
+                    "file_path": "/var/log/docker",
+                    "log_group_name": "${ECSCluster}-/var/log/docker",
+                    "log_stream_name": "{instance_id}",
+                    "timestamp_format": "%Y-%m-%dT%H:%M:%S.%f"
+                  },
+                  {
+                    "file_path": "/var/log/ecs/ecs-init.log",
+                    "log_group_name": "${ECSCluster}-/var/log/ecs/ecs-init.log",
+                    "log_stream_name": "{instance_id}",
+                    "timestamp_format": "%Y-%m-%dT%H:%M:%SZ"
+                  },
+                  {
+                    "file_path": "/var/log/ecs/ecs-agent.log.*",
+                    "log_group_name": "${ECSCluster}-/var/log/ecs/ecs-agent.log",
+                    "log_stream_name": "{instance_id}",
+                    "timestamp_format": "%Y-%m-%dT%H:%M:%SZ"
+                  },
+                  {
+                    "file_path": "/var/log/ecs/audit.log",
+                    "log_group_name": "${ECSCluster}-/var/log/ecs/audit.log",
+                    "log_stream_name": "{instance_id}",
+                    "timestamp_format": "%Y-%m-%dT%H:%M:%SZ"
+                  }
+                ]
+              }
+            }
+          },
+          "metrics": {
+            "append_dimensions": {
+              "AutoScalingGroupName": "${!aws:AutoScalingGroupName}",
+              "InstanceId": "${!aws:InstanceId}",
+              "InstanceType": "${!aws:InstanceType}"
+            },
+            "metrics_collected": {
+              "collectd": {
+                "metrics_aggregation_interval": 60
+              },
+              "disk": {
+                "measurement": [
+                  "used_percent"
+                ],
+                "metrics_collection_interval": 60,
+                "resources": [
+                  "/"
+                ]
+              },
+              "mem": {
+                "measurement": [
+                  "mem_used_percent"
+                ],
+                "metrics_collection_interval": 60
+              },
+              "statsd": {
+                "metrics_aggregation_interval": 60,
+                "metrics_collection_interval": 10,
+                "service_address": ":8125"
+              }
+            }
+          }
+        }
