@@ -8,6 +8,7 @@ pipeline {
 				checkout scm
             }
         }
+        
         stage('Create stack') {
 			steps {
                 sh '''aws cloudformation  deploy --template-file ECS-stack.yaml\
