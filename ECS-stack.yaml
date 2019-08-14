@@ -32,7 +32,7 @@ Parameters:
   ECSAMI: 
     Description: "ID of the AMI to use for the EC2 instances"
     Type: "AWS::EC2::Image::Id"
-    Default: ami-0fac5486e4cff37f4	
+    Default: "ami-0fac5486e4cff37f4"
   KeyName: 
     ConstraintDescription: "must be the name of an existing EC2 KeyPair."
     Type: "AWS::EC2::KeyPair::KeyName"
