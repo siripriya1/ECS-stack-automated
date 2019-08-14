@@ -13,7 +13,8 @@ pipeline {
 			steps {
                 sh '''aws cloudformation deploy --template-file ECS-stack.yaml \
                     --stack-name "ECS-stack" \
-                    --capabilities=CAPABILITY_NAMED_IAM'''
+                    --capabilities=CAPABILITY_NAMED_IAM \
+                    --region us-east-1'''
             }
         }
     }
