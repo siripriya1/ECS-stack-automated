@@ -5,13 +5,11 @@ Parameters:
   VPC:
     Type: AWS::EC2::VPC::Id
     Description: VPC the stack should be created in.
-    Default: vpc-aa0da4d0
-  
+    Default: vpc-aa0da4d0 
   SubnetIds:
     Description: A list of the subnet ids.
     Type: List<AWS::EC2::Subnet::Id>
     Default: subnet-8ff26ee8,subnet-8fe77ca1
-
   ProjectName:
     Description: Project Purpose or Name
     Type: String
@@ -417,6 +415,73 @@ Resources:
     CreationPolicy:
       ResourceSignal:
         Timeout: PT15Ms
+
+  SAICResearchDBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Subnets available for the RDS DB Instance
+      SubnetIds: !Ref SubnetIds
+      Tags:
+      - Key: Name
+        Value: SAIC Research RDS
+      - Key: ApplicationType
+        Value: DB subnet Group
+      - Key: Account
+        Value: SAIC Research
+      - Key: Project
+        Value: SAIC Research
+      - Key: Applicaton
+        Value: SAIC Research RDS   
+
+  SAICResearchVPCSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName : SAICResearchDBVPCSG
+      GroupDescription: VPC Security group for RDS DB Instance.
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 3306
+        ToPort: 3306
+        CidrIp: 0.0.0.0/0
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Name
+        Value: !Join [ "-", [!Ref ProjectName, !Ref Environment,  "DBVPC-SG"] ]
+      - Key: ApplicationType
+        Value: DB VPC security Group
+      - Key: Account
+        Value: SAIC Research
+      - Key: Project
+        Value: SAIC Research
+      - Key: Applicaton
+        Value: SAIC Research RDS      
+
+  SAICResearchDB:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBName: SaferDB
+      AvailabilityZone: us-east-1a
+      AllocatedStorage: '25'
+      DBInstanceClass: db.t2.micro
+      Engine: MySQL
+      MasterUsername: siri
+      MasterUserPassword: Smsmsl@1
+      PubliclyAccessible: true
+      DBSubnetGroupName: !Ref SAICResearchDBSubnetGroup
+      VPCSecurityGroups:
+      - !Ref SAICResearchVPCSecurityGroup
+      Tags:
+      - Key: Name
+        Value: !Join [ "-", [!Ref ProjectName, !Ref Environment,  "DataBase"] ]
+      - Key: ApplicationType
+        Value: Data Base
+      - Key: Account
+        Value: SAIC Research
+      - Key: Project
+        Value: SAIC Research
+      - Key: Applicaton
+        Value: SAIC Research RDS
+    DeletionPolicy: Snapshot
 
   ECSCloudWatchParameter:
     Type: AWS::SSM::Parameter
