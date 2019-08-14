@@ -465,7 +465,7 @@ Resources:
       DBInstanceClass: db.t2.micro
       Engine: MySQL
       MasterUsername: siri
-      MasterUserPassword: siri
+      MasterUserPassword: S1k2s3l4k5
       PubliclyAccessible: true
       DBSubnetGroupName: !Ref SAICResearchDBSubnetGroup
       VPCSecurityGroups:
