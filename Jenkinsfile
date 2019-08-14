@@ -13,8 +13,7 @@ pipeline {
 			steps {
                 sh '''aws cloudformation deploy --template-file ECS-stack.yaml \
                     --stack-name "ECS-stack" \
-                    --capabilities=CAPABILITY_NAMED_IAM \
-                    --timeout-in-minutes 15'''
+                    --capabilities=CAPABILITY_NAMED_IAM'''
             }
         }
     }
