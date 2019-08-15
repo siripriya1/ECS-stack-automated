@@ -459,7 +459,7 @@ Resources:
   SAICResearchDB:
     Type: AWS::RDS::DBInstance
     Properties:
-      DBName: SaferDB
+      DBName: SAICResearch
       AvailabilityZone: us-east-1a
       AllocatedStorage: '25'
       DBInstanceClass: db.t2.micro
