@@ -30,9 +30,7 @@ pipeline {
             }
 			steps {
                 sh '''aws cloudformation delete-stack --stack-name ECS-stack --region us-east-1 \
-                        echo "Waiting for the stack to be deleted, this may take a few minutes..." \
-                        aws cloudformation wait stack-delete-complete --stack-name ECS-stack \
-                        echo "Done"'''
+                        aws cloudformation wait stack-delete-complete --stack-name ECS-stack'''
 
             }
         }
