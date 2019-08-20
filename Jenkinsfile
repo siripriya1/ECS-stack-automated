@@ -2,7 +2,6 @@
 pipeline {
     agent any
     parameters {
-        string(defaultValue: "TEST", description: 'What environment?', name: 'userFlag')
         choice(choices: ['create', 'delete'], description: 'create or delete stack', name: 'action')
     }
     stages {
