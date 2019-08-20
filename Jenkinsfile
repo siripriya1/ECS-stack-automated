@@ -29,7 +29,7 @@ pipeline {
                 expression { params.action == 'delete' }
             }
 			steps {
-                sh '''aws cloudformation delete-stack --stack-name ECS-stack'''
+                sh '''aws cloudformation delete-stack --stack-name ECS-stack --region us-east-1'''
             }
         }
     }
