@@ -343,7 +343,7 @@ Resources:
       - Key: Account
         Value: !Ref ProjectName  
 
-  AlbHTTPSListenerRuleWebservice1:
+  AlbHTTPListenerRuleWebservice1:
     Type: AWS::ElasticLoadBalancingV2::ListenerRule
     DependsOn:
     - Webservice1TG
@@ -355,7 +355,7 @@ Resources:
       - Field: path-pattern
         Values:
         - "/Webservice1/V1/*"
-      ListenerArn: !Ref ExtAlbHTTPSListener
+      ListenerArn: !Ref ExtAlbHTTPListener
       Priority: 1           
       
   # ExtAlbHTTPSListener:
