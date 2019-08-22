@@ -309,6 +309,55 @@ Resources:
       Port: '80'
       Protocol: HTTP
 
+  Webservice1TG:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Join [ "-", ["Webservice1", !Ref Environment, "TG"] ]
+      HealthCheckPath: "/safer-upload-service/V1/health"
+      HealthCheckIntervalSeconds: 30
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 3
+      Matcher:
+        HttpCode: '200'
+      Port: 8001
+      Protocol: HTTP
+      TargetGroupAttributes:
+      - Key: deregistration_delay.timeout_seconds
+        Value: '300'
+      UnhealthyThresholdCount: 5
+      VpcId: !Ref VPC
+      Tags:
+      - Key: ApplicationName
+        Value: !Join [ "-", [!Ref ProjectName, !Ref Environment, "TG"] ]
+      - Key: ApplicationType
+        Value: Webservice1 target group
+      - Key: Environment
+        Value: !Ref Environment
+      - Key: Owner
+        Value: Siri
+      - Key: Project
+        Value: !Ref ProjectName
+      - Key: Application
+        Value: ECS Stack             
+      - Key: Account
+        Value: !Ref ProjectName  
+
+  AlbHTTPSListenerRuleWebservice1:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    DependsOn:
+    - Webservice1TG
+    Properties:
+      Actions:
+      - Type: forward
+        TargetGroupArn: !Ref Webservice1TG
+      Conditions:
+      - Field: path-pattern
+        Values:
+        - "/Webservice1/V1/*"
+      ListenerArn: !Ref ExtAlbHTTPSListener
+      Priority: 1           
+      
   # ExtAlbHTTPSListener:
   #   Type: AWS::ElasticLoadBalancingV2::Listener
   #   Properties:
