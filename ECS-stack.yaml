@@ -357,7 +357,35 @@ Resources:
         - "/Webservice1/V1/*"
       ListenerArn: !Ref ExtAlbHTTPListener
       Priority: 1           
-      
+
+  ECSServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: ECSServiceRole  
+      AssumeRolePolicyDocument:
+        Statement:
+        - Action:
+          - sts:AssumeRole
+          Effect: Allow
+          Principal:
+            Service:
+            - ecs.amazonaws.com
+      Path: "/"
+      Policies:
+      - PolicyDocument:
+          Statement:
+          - Action:
+            - elasticloadbalancing:Describe*
+            - elasticloadbalancing:DeregisterInstancesFromLoadBalancer
+            - elasticloadbalancing:RegisterInstancesWithLoadBalancer
+            - elasticloadbalancing:DeregisterTargets
+            - elasticloadbalancing:RegisterTargets
+            - ec2:Describe*
+            - ec2:AuthorizeSecurityGroupIngress
+            Effect: Allow
+            Resource: "*"
+        PolicyName: ecs-service
+
   # ExtAlbHTTPSListener:
   #   Type: AWS::ElasticLoadBalancingV2::Listener
   #   Properties:
