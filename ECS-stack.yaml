@@ -313,7 +313,7 @@ Resources:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
       Name: !Join [ "-", ["Webservice1", !Ref Environment, "TG"] ]
-      HealthCheckPath: "/safer-upload-service/V1/health"
+      HealthCheckPath: "/Webservice1/V1/health"
       HealthCheckIntervalSeconds: 30
       HealthCheckProtocol: HTTP
       HealthCheckTimeoutSeconds: 5
