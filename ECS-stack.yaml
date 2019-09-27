@@ -405,7 +405,7 @@ Resources:
         Values:
         - "/Webservice2/V1/*"
       ListenerArn: !Ref ExtAlbHTTPListener
-      Priority: 1                
+      Priority: 2                
 
   ECSServiceRole:
     Type: AWS::IAM::Role
