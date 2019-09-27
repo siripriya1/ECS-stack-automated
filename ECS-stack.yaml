@@ -343,6 +343,40 @@ Resources:
       - Key: Account
         Value: !Ref ProjectName  
 
+  Webservice2TG:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Join [ "-", ["Webservice2", !Ref Environment, "TG"] ]
+      HealthCheckPath: "/Webservice2/V1/health"
+      HealthCheckIntervalSeconds: 30
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 3
+      Matcher:
+        HttpCode: '200'
+      Port: 8001
+      Protocol: HTTP
+      TargetGroupAttributes:
+      - Key: deregistration_delay.timeout_seconds
+        Value: '300'
+      UnhealthyThresholdCount: 5
+      VpcId: !Ref VPC
+      Tags:
+      - Key: ApplicationName
+        Value: !Join [ "-", [!Ref ProjectName, !Ref Environment, "TG"] ]
+      - Key: ApplicationType
+        Value: Webservice2 target group
+      - Key: Environment
+        Value: !Ref Environment
+      - Key: Owner
+        Value: Siri
+      - Key: Project
+        Value: !Ref ProjectName
+      - Key: Application
+        Value: ECS Stack             
+      - Key: Account
+        Value: !Ref ProjectName          
+
   AlbHTTPListenerRuleWebservice1:
     Type: AWS::ElasticLoadBalancingV2::ListenerRule
     DependsOn:
@@ -356,7 +390,22 @@ Resources:
         Values:
         - "/Webservice1/V1/*"
       ListenerArn: !Ref ExtAlbHTTPListener
-      Priority: 1           
+      Priority: 1 
+
+  AlbHTTPListenerRuleWebservice2:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    DependsOn:
+    - Webservice2TG
+    Properties:
+      Actions:
+      - Type: forward
+        TargetGroupArn: !Ref Webservice2TG
+      Conditions:
+      - Field: path-pattern
+        Values:
+        - "/Webservice2/V1/*"
+      ListenerArn: !Ref ExtAlbHTTPListener
+      Priority: 1                
 
   ECSServiceRole:
     Type: AWS::IAM::Role
