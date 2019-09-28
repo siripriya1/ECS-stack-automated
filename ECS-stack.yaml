@@ -346,7 +346,7 @@ Resources:
   Webservice2TG:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
-      Name: !Join [ "-", ["Webservice2", !Ref Environment, "TG"] ]
+      Name: !Join [ "-", ["Webservice2-", !Ref Environment, "TG"] ]
       HealthCheckPath: "/Webservice2/V1/health"
       HealthCheckIntervalSeconds: 30
       HealthCheckProtocol: HTTP
